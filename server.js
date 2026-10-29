@@ -3,8 +3,10 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const Product = require("./models/product.js");
 
+require("dotenv").config();
+
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -37,17 +39,13 @@ app.get("/products", async (req, res) => {
 app.get("/products/:id", async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({
-        message: "Invalid product ID"
-      });
+      return res.status(400).json({ message: "Invalid product ID" });
     }
 
     const product = await Product.findById(req.params.id);
 
     if (!product) {
-      return res.status(404).json({
-        message: "Product not found"
-      });
+      return res.status(404).json({ message: "Product not found" });
     }
 
     res.json(product);
@@ -61,9 +59,16 @@ app.post("/products", async (req, res) => {
   try {
     const { name, price, category, description, image } = req.body;
 
-    if (!name || price === undefined || price === "") {
+    if (
+      typeof name !== "string" ||
+      !name.trim() ||
+      price === undefined ||
+      price === "" ||
+      !Number.isFinite(Number(price)) ||
+      Number(price) < 0
+    ) {
       return res.status(400).json({
-        message: "Product name and price are required"
+        message: "Valid product name and price are required"
       });
     }
 
@@ -88,9 +93,7 @@ app.post("/products", async (req, res) => {
 app.put("/products/:id", async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({
-        message: "Invalid product ID"
-      });
+      return res.status(400).json({ message: "Invalid product ID" });
     }
 
     const product = await Product.findByIdAndUpdate(
@@ -100,9 +103,7 @@ app.put("/products/:id", async (req, res) => {
     );
 
     if (!product) {
-      return res.status(404).json({
-        message: "Product not found"
-      });
+      return res.status(404).json({ message: "Product not found" });
     }
 
     res.json({
@@ -118,26 +119,20 @@ app.put("/products/:id", async (req, res) => {
 app.delete("/products/:id", async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({
-        message: "Invalid product ID"
-      });
+      return res.status(400).json({ message: "Invalid product ID" });
     }
 
     const product = await Product.findByIdAndDelete(req.params.id);
 
     if (!product) {
-      return res.status(404).json({
-        message: "Product not found"
-      });
+      return res.status(404).json({ message: "Product not found" });
     }
 
     cart = cart.filter(
       item => item.productId !== product._id.toString()
     );
 
-    res.json({
-      message: "Product deleted successfully"
-    });
+    res.json({ message: "Product deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -149,9 +144,7 @@ app.post("/cart", async (req, res) => {
     const { productId, quantity = 1 } = req.body;
 
     if (!mongoose.isValidObjectId(productId)) {
-      return res.status(400).json({
-        message: "Invalid product ID"
-      });
+      return res.status(400).json({ message: "Invalid product ID" });
     }
 
     const qty = Number(quantity);
@@ -207,14 +200,10 @@ app.get("/cart", (req, res) => {
 
 // REMOVE cart item
 app.delete("/cart/:id", (req, res) => {
-  const index = cart.findIndex(
-    item => item.id === req.params.id
-  );
+  const index = cart.findIndex(item => item.id === req.params.id);
 
   if (index === -1) {
-    return res.status(404).json({
-      message: "Cart item not found"
-    });
+    return res.status(404).json({ message: "Cart item not found" });
   }
 
   cart.splice(index, 1);
@@ -231,15 +220,22 @@ app.delete("/cart/:id", (req, res) => {
   });
 });
 
-// Connect MongoDB and start server
-mongoose.connect("mongodb://127.0.0.1:27017/OnlineShoppingCart")
-  .then(() => {
-    console.log("MongoDB connected successfully");
+// Connect to Atlas and start server
+async function startServer() {
+  try {
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is missing from the .env file");
+    }
 
-    app.listen(PORT, () => {
-      console.log(`Server running at http://localhost:${PORT}`);
-    });
-  })
-  .catch(error => {
-    console.error("MongoDB connection error:", error.message);
-  });
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("MongoDB Atlas connected successfully");
+
+    app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
+  } catch (error) {
+    console.error("Startup error:", error.message);
+  }
+}
+
+startServer();
